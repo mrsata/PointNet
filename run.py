@@ -1,33 +1,53 @@
+from functools import lru_cache
+from time import time
+import os
 import h5py
 import tensorflow as tf
 import numpy as np
+np.random.seed(0)
+tf.set_random_seed(0)
 
 from model import placeholder, get_model, get_loss
 
 
-B = 8
-N = 1024 * 2
-MAX_EPOCH = 10000
+B = 32
+N = 1024
+LR = .001
+MAX_EPOCH = 10
+DISPITER = 512
+LOG_DIR = "log"
+if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
 
-def load_pcloud(hf, keys):
-    pclouds = np.zeros((B, N, 3))
-    labels = np.zeros(B)
-    for key in keys:
-        pcloud = hf[key]["points"][:]
-        pcloud = np.asarray(pcloud, dtype=np.float32)
-        indices = np.arange(pcloud.shape[0])
-        np.random.shuffle(indices)
-        pcloud = pcloud[indices[:N]]
-        label = hf[key].attrs["label"]
-        pclouds[keys.index(key)] = pcloud
-        labels[keys.index(key)] = label
-    return pclouds, labels
+@lru_cache()
+def load_pcloud(data, key):
+    input = data[key]["points"][:]
+    input = np.asarray(input, dtype=np.float32)
+    label = data[key].attrs["label"]
+    return input, label
+
+
+def load_batch(data, b, is_training):
+    keys = list(data.keys())
+    if is_training:
+        inputs = np.zeros((B, N, 3))
+        labels = np.zeros(B)
+        for i, key in enumerate(keys[b:b+B]):
+            input, label = load_pcloud(data, key)
+            indices = np.random.permutation(input.shape[0])
+            input = input[indices[:N]]
+            inputs[i] = input
+            labels[i] = label
+    else:
+        input, label = load_pcloud(data, keys[b])
+        inputs = input[np.newaxis]
+        labels = label[np.newaxis]
+    return inputs, labels
 
 
 def train():
 
-    hf = h5py.File("input/train_point_clouds.h5", "r")
-    keys = list(hf.keys())
+    data_train = h5py.File("data/3DMNIST/train_point_clouds.h5", "r")
+    data_test = h5py.File("data/3DMNIST/test_point_clouds.h5", "r")
 
     with tf.Graph().as_default():
 
@@ -36,10 +56,13 @@ def train():
         pred = get_model(inputs, is_training)
         loss = get_loss(pred, labels)
 
-        optimizer = tf.train.AdamOptimizer(learning_rate=.001)
-        train_op = optimizer.minimize(loss)
+        optimizer = tf.train.AdamOptimizer(learning_rate=LR)
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            train_op = optimizer.minimize(loss)
 
-        tf.set_random_seed(1234)
+        saver = tf.train.Saver()
+
         init = tf.global_variables_initializer()
         sess = tf.Session()
         sess.run(init)
@@ -54,31 +77,67 @@ def train():
         }
 
         print('\nStart training\n')
+        start = time()
 
-        total_correct = 0
-        total_loss = 0
-        total_seen = 0
+        for ep in range(MAX_EPOCH):
 
-        for epoch in range(0, MAX_EPOCH, B):
+            print("#### EPOCH {:03} ####".format(ep + 1))
+            begin = time()
+            train_one_epoch(data_train, sess, ops)
+            print("---- Time elapsed: {:.2f}s".format(time() - begin))
+            eval_one_epoch(data_test, sess, ops)
+            # save_path = saver.save(sess, "log/model_B%dN%d.ckpt" % (B, N//1000))
+            save_path = saver.save(sess, "log/model.ckpt")
 
-            pclouds, digits = load_pcloud(hf, keys[epoch % len(keys):epoch % len(keys)+ B])
-            feed_dict = {ops['inputs']: pclouds,
-                         ops['labels']: digits,
-                         ops['is_training']: True,}
-            _, loss_val, pred_val = sess.run([ops['train_op'], ops['loss'], ops['pred']], feed_dict=feed_dict)
-            # if np.argmax(pred_val) == digits[0]:
-            #     correct += 1
-            # accr = correct
-            pred_val = np.argmax(pred_val, 1)
-            correct = np.sum(pred_val == digits)
-            total_correct += correct
-            total_loss += loss_val * B
-            total_seen += B
+        print("Total time: {:.2f}s".format(time() - start))
 
-            if epoch % 100 == 0:
-                print('epoch: {:3}, loss: {:4f}, accr: {:4f}'.format(epoch, total_loss / total_seen, total_correct / total_seen))
-                # print('epoch: {:3}, loss: {:4f}, accr: {}%'.format(epoch + 1, loss_val, accr))
-                # print(pred_val)
+
+def train_one_epoch(data, sess, ops):
+    is_training = True
+    total_corr = 0.; total_loss = 0.; total_seen = 0.
+
+    for b in range(0, len(data), B):
+        if b + B > len(data): break
+        pclouds, digits = load_batch(data, b, is_training=is_training)
+        feed_dict = {ops['inputs']: pclouds,
+                     ops['labels']: digits,
+                     ops['is_training']: is_training,}
+        _, loss_val, pred_val = sess.run([ops['train_op'], ops['loss'], ops['pred']], feed_dict=feed_dict)
+
+        pred_val = np.argmax(pred_val, 1)
+        correct = np.sum(pred_val == digits)
+        total_corr += correct
+        total_loss += loss_val * B
+        total_seen += B
+
+        if (b+B) % DISPITER == 0:
+            loss = total_loss / total_seen
+            accr = total_corr / total_seen * 100
+            print('{:04} loss: {:.4f} accr: {:.2f}%'.format(b+B, loss, accr))
+            total_corr = 0.; total_loss = 0.; total_seen = 0.
+
+
+def eval_one_epoch(data, sess, ops):
+    is_training = False
+    total_corr = 0; total_loss = 0; total_seen = 0
+
+    for b in range(0, len(data), B):
+        if b + B > len(data): break
+        pclouds, digits = load_batch(data, b, is_training=True)
+        feed_dict = {ops['inputs']: pclouds,
+                     ops['labels']: digits,
+                     ops['is_training']: is_training,}
+        loss_val, pred_val = sess.run([ops['loss'], ops['pred']], feed_dict=feed_dict)
+
+        pred_val = np.argmax(pred_val, 1)
+        correct = np.sum(pred_val == digits)
+        total_corr += correct
+        total_loss += loss_val * B
+        total_seen += B
+
+    loss = total_loss / total_seen
+    accr = total_corr / total_seen * 100
+    print('Eval loss: {:.4f} accr: {:.2f}%'.format(loss, accr))
 
 
 if __name__ == "__main__":
