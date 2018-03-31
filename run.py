@@ -1,5 +1,6 @@
 from functools import lru_cache
 from time import time
+import argparse
 import os
 import h5py
 import tensorflow as tf
@@ -10,13 +11,23 @@ tf.set_random_seed(0)
 from model import placeholder, get_model, get_loss
 
 
-B = 32
-N = 1024
-LR = .001
-MAX_EPOCH = 10
-DISPITER = 512
-LOG_DIR = "log"
+parser = argparse.ArgumentParser()
+parser.add_argument('--log_dir', default='log', help='Log dir [default: log]')
+parser.add_argument('--num_point', type=int, default=1024, help='Point Number [256/512/1024/2048] [default: 1024]')
+parser.add_argument('--max_epoch', type=int, default=10, help='Epoch to run [default: 10]')
+parser.add_argument('--batch_size', type=int, default=50, help='Batch Size during training [default: 50]')
+parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate [default: 0.001]')
+FLAGS = parser.parse_args()
+
+
+B = FLAGS.batch_size
+N = FLAGS.num_point
+LR = FLAGS.learning_rate
+MAX_EPOCH = FLAGS.max_epoch
+LOG_DIR = FLAGS.log_dir
+DISPITER = 500
 if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
+
 
 @lru_cache()
 def load_pcloud(data, key):
