@@ -27,6 +27,14 @@ MAX_EPOCH = FLAGS.max_epoch
 LOG_DIR = FLAGS.log_dir
 DISPITER = 500
 if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
+LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
+LOG_FOUT.write(str(FLAGS)+'\n')
+
+
+def log(out_str):
+    LOG_FOUT.write(out_str+'\n')
+    LOG_FOUT.flush()
+    print(out_str)
 
 
 @lru_cache()
@@ -87,20 +95,20 @@ def train():
             'train_op': train_op,
         }
 
-        print('\nStart training\n')
+        log('\nStart training\n')
         start = time()
 
         for ep in range(MAX_EPOCH):
 
-            print("#### EPOCH {:03} ####".format(ep + 1))
+            log("#### EPOCH {:03} ####".format(ep + 1))
             begin = time()
             train_one_epoch(data_train, sess, ops)
-            print("---- Time elapsed: {:.2f}s".format(time() - begin))
+            log("---- Time elapsed: {:.2f}s".format(time() - begin))
             eval_one_epoch(data_test, sess, ops)
             # save_path = saver.save(sess, "log/model_B%dN%d.ckpt" % (B, N//1000))
             save_path = saver.save(sess, "log/model.ckpt")
 
-        print("Total time: {:.2f}s".format(time() - start))
+        log("Total time: {:.2f}s".format(time() - start))
 
 
 def train_one_epoch(data, sess, ops):
@@ -124,7 +132,7 @@ def train_one_epoch(data, sess, ops):
         if (b+B) % DISPITER == 0:
             loss = total_loss / total_seen
             accr = total_corr / total_seen * 100
-            print('{:04} loss: {:.4f} accr: {:.2f}%'.format(b+B, loss, accr))
+            log('{:04} loss: {:.4f} accr: {:.2f}%'.format(b+B, loss, accr))
             total_corr = 0.; total_loss = 0.; total_seen = 0.
 
 
@@ -148,7 +156,7 @@ def eval_one_epoch(data, sess, ops):
 
     loss = total_loss / total_seen
     accr = total_corr / total_seen * 100
-    print('Eval loss: {:.4f} accr: {:.2f}%'.format(loss, accr))
+    log('Eval loss: {:.4f} accr: {:.2f}%'.format(loss, accr))
 
 
 if __name__ == "__main__":
