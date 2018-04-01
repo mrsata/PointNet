@@ -112,7 +112,7 @@ def train():
             log("---- Time elapsed: {:.2f}s".format(time() - begin))
             eval_one_epoch(data_test, sess, ops)
             # save_path = saver.save(sess, "log/model_B%dN%d.ckpt" % (B, N//1000))
-            save_path = saver.save(sess, "log/model.ckpt")
+            save_path = saver.save(sess, os.path.join(LOG_DIR, "model.ckpt"))
 
         log("Total time: {:.2f}s".format(time() - start))
 
