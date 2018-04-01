@@ -8,11 +8,12 @@ import numpy as np
 np.random.seed(0)
 tf.set_random_seed(0)
 
-from model import placeholder, get_model, get_loss
+from model import placeholder, get_model, get_loss, placeholder_dense, get_model_dense
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--log_dir', default='log', help='Log dir [default: log]')
+parser.add_argument('--dense', type=bool, default=False, help='Whether use dense model [default: False]')
 parser.add_argument('--num_point', type=int, default=1024, help='Point Number [256/512/1024/2048] [default: 1024]')
 parser.add_argument('--max_epoch', type=int, default=10, help='Epoch to run [default: 10]')
 parser.add_argument('--batch_size', type=int, default=50, help='Batch Size during training [default: 50]')
@@ -25,6 +26,7 @@ N = FLAGS.num_point
 LR = FLAGS.learning_rate
 MAX_EPOCH = FLAGS.max_epoch
 LOG_DIR = FLAGS.log_dir
+DENSE = FLAGS.dense
 DISPITER = 500
 if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
 LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
@@ -70,9 +72,13 @@ def train():
 
     with tf.Graph().as_default():
 
-        inputs, labels = placeholder(B, N)
         is_training = tf.placeholder(tf.bool, shape=())
-        pred = get_model(inputs, is_training)
+        if DENSE:
+            inputs, labels = placeholder_dense(B, N)
+            pred = get_model_dense(inputs, is_training)
+        else:
+            inputs, labels = placeholder(B, N)
+            pred = get_model(inputs, is_training)
         loss = get_loss(pred, labels)
 
         optimizer = tf.train.AdamOptimizer(learning_rate=LR)
