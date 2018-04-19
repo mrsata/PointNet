@@ -8,7 +8,7 @@ import numpy as np
 np.random.seed(0)
 tf.set_random_seed(0)
 
-from model import placeholder, get_model, get_loss, placeholder_dense, get_model_dense
+from model import placeholder, get_model, get_loss
 
 
 parser = argparse.ArgumentParser()

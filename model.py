@@ -98,7 +98,7 @@ def get_loss(pred, label):
 def conv2d(inputs, filter, kernal, bn=False, bn_mom=None, activation=tf.nn.relu, training=None):
     output = tf.layers.conv2d(inputs, filter, kernal)
     if bn:
-        output = bn(output, bn_mom, training)
+        output = batch_norm(output, bn_mom, training)
     if activation is not None:
         output = activation(output)
     return output
@@ -107,12 +107,12 @@ def conv2d(inputs, filter, kernal, bn=False, bn_mom=None, activation=tf.nn.relu,
 def dense(inputs, units, bn=False, bn_mom=None, activation=tf.nn.relu, training=None):
     output = tf.layers.dense(inputs, units)
     if bn:
-        output = bn(output, bn_mom, training)
+        output = batch_norm(output, bn_mom, training)
     if activation is not None:
         output = activation(output)
     return output
 
 
-def bn(inputs, bn_mom=None, training=None):
+def batch_norm(inputs, bn_mom=None, training=None):
     if bn_mom is None: bn_mom = 0.9
     return tf.layers.batch_normalization(inputs, momentum=bn_mom, training=training)
