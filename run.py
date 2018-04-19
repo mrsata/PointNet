@@ -13,10 +13,11 @@ from model import placeholder, get_model, get_loss, placeholder_dense, get_model
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--log_dir', default='log', help='Log dir [default: log]')
-parser.add_argument('--dense', type=bool, default=False, help='Whether use dense model [default: False]')
+parser.add_argument('--tnet', type=bool, default=False, help='Whether use T-Net [default: False]')
 parser.add_argument('--num_point', type=int, default=1024, help='Point Number [256/512/1024/2048] [default: 1024]')
 parser.add_argument('--max_epoch', type=int, default=10, help='Epoch to run [default: 10]')
 parser.add_argument('--batch_size', type=int, default=50, help='Batch Size during training [default: 50]')
+parser.add_argument('--bn_mom', type=float, default=0.9, help='Batch normalization momentum [default: 0.9]')
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate [default: 0.001]')
 FLAGS = parser.parse_args()
 
@@ -26,7 +27,8 @@ N = FLAGS.num_point
 LR = FLAGS.learning_rate
 MAX_EPOCH = FLAGS.max_epoch
 LOG_DIR = FLAGS.log_dir
-DENSE = FLAGS.dense
+TNET = FLAGS.tnet
+BN_MOM = FLAGS.bn_mom
 DISPITER = 500
 if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
 LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
@@ -73,12 +75,8 @@ def train():
     with tf.Graph().as_default():
 
         is_training = tf.placeholder(tf.bool, shape=())
-        if DENSE:
-            inputs, labels = placeholder_dense(B, N)
-            pred = get_model_dense(inputs, is_training)
-        else:
-            inputs, labels = placeholder(B, N)
-            pred = get_model(inputs, is_training)
+        inputs, labels = placeholder(B, N)
+        pred = get_model(inputs, is_training, k=10, use_tnet=TNET, bn_mom=BN_MOM)
         loss = get_loss(pred, labels)
 
         optimizer = tf.train.AdamOptimizer(learning_rate=LR)
