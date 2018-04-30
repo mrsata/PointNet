@@ -16,7 +16,7 @@ parser.add_argument('-t', '--tnet', type=bool, default=False, help='Whether use 
 parser.add_argument('-n', '--num_point', type=int, default=1024, help='Point Number [64/128/512/1024/2048] [default: 1024]')
 parser.add_argument('-e', '--num_point_eval', type=int, default=1024, help='Point Number for Evaluation [64/128/512/1024/2048] [default: 1024]')
 parser.add_argument('-s', '--size_of_layer', type=int, default=1024, help='Size of the last layer [512/1024/2048] [default: 1024]')
-parser.add_argument('-m', '--max_epoch', type=int, default=25, help='Epoch to run [default: 25]')
+parser.add_argument('-m', '--max_epoch', type=int, default=22, help='Epoch to run [default: 22]')
 parser.add_argument('-b', '--batch_size', type=int, default=50, help='Batch Size during training [default: 50]')
 parser.add_argument('-bm', '--bn_mom', type=float, default=0.9, help='Batch normalization momentum [default: 0.9]')
 parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, help='Initial learning rate [default: 0.001]')
@@ -111,7 +111,9 @@ def train():
         start = time()
 
         for ep in range(MAX_EPOCH):
-            if ep == 20: LR /= 10
+            if ep == 20:
+                global LR
+                LR /= 10
             log("#### EPOCH {:03} ####".format(ep + 1))
             begin = time()
             train_one_epoch(data_train, sess, ops)
