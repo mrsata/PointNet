@@ -15,6 +15,7 @@ parser.add_argument('-l', '--log_dir', default='log', help='Log dir [default: lo
 parser.add_argument('-t', '--tnet', type=bool, default=False, help='Whether use T-Net [default: False]')
 parser.add_argument('-n', '--num_point', type=int, default=1024, help='Point Number [64/128/512/1024/2048] [default: 1024]')
 parser.add_argument('-e', '--num_point_eval', type=int, default=1024, help='Point Number for Evaluation [64/128/512/1024/2048] [default: 1024]')
+parser.add_argument('-s', '--size_of_layer', type=int, default=1024, help='Size of the last layer [512/1024/2048] [default: 1024]')
 parser.add_argument('-m', '--max_epoch', type=int, default=10, help='Epoch to run [default: 10]')
 parser.add_argument('-b', '--batch_size', type=int, default=50, help='Batch Size during training [default: 50]')
 parser.add_argument('-bm', '--bn_mom', type=float, default=0.9, help='Batch normalization momentum [default: 0.9]')
@@ -23,6 +24,7 @@ FLAGS = parser.parse_args()
 
 
 B = FLAGS.batch_size
+S = FLAGS.size_of_layer
 N = FLAGS.num_point
 NE = FLAGS.num_point_eval
 LR = FLAGS.learning_rate
@@ -32,7 +34,7 @@ TNET = FLAGS.tnet
 BN_MOM = FLAGS.bn_mom
 DISPITER = 500//B*B if 500-500//B*B < 500//B*B+B-500 else 500//B*B+B
 if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
-LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
+LOG_FOUT = open(os.path.join(LOG_DIR, LOG_DIR + '.txt'), 'w')
 LOG_FOUT.write(str(FLAGS)+'\n')
 
 
@@ -80,10 +82,11 @@ def train():
 
         is_training = tf.placeholder(tf.bool, shape=())
         inputs, labels = placeholder(B, N)
-        pred = get_model(inputs, is_training, k=10, use_tnet=TNET, bn_mom=BN_MOM)
+        pred = get_model(inputs, is_training, k=10, s=S, use_tnet=TNET, bn_mom=BN_MOM)
         loss = get_loss(pred, labels)
 
-        optimizer = tf.train.AdamOptimizer(learning_rate=LR)
+        learning_rate = tf.placeholder(tf.float32, shape=[])
+        optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             train_op = optimizer.minimize(loss)
@@ -101,13 +104,14 @@ def train():
             'pred': pred,
             'loss': loss,
             'train_op': train_op,
+            'learning_rate': LR,
         }
 
         log('\nStart training\n')
         start = time()
 
         for ep in range(MAX_EPOCH):
-
+            if ep == 20: ops['learning_rate'] /= 10
             log("#### EPOCH {:03} ####".format(ep + 1))
             begin = time()
             train_one_epoch(data_train, sess, ops)

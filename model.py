@@ -8,13 +8,13 @@ def placeholder(B, N):
     return inputs, labels
 
 
-def get_model(inputs, is_training, k=10, bn_mom=None, use_tnet=False):
+def get_model(inputs, is_training, k=10, s=1024, bn_mom=None, use_tnet=False):
     '''
     Architecture:
         T-Net 1 ( MLP(64, 128, 1024) + FC(512, 256) )
         MLP 1 (64, 64)
         T-Net 2 ( MLP(64, 128, 1024) + FC(512, 256) )
-        MLP 2 (64, 128, 1024)
+        MLP 2 (64, 128, s)
         Max Pooling
         FC (512, 256, k)
     Input:
@@ -74,13 +74,13 @@ def get_model(inputs, is_training, k=10, bn_mom=None, use_tnet=False):
     # MLP 2
     net = conv2d(net, 64, [1, 1], bn=bn, bn_mom=bn_mom, training=is_training)
     net = conv2d(net, 128, [1, 1], bn=bn, bn_mom=bn_mom, training=is_training)
-    net = conv2d(net, 1024, [1, 1], bn=bn, bn_mom=bn_mom, training=is_training)
+    net = conv2d(net, s, [1, 1], bn=bn, bn_mom=bn_mom, training=is_training)
 
     # Max Pooling
     net = tf.reduce_max(net, axis=1)
 
     # FC
-    net = tf.reshape(net, [-1, 1024])
+    net = tf.reshape(net, [-1, s])
     net = dense(net, 512, bn=bn, bn_mom=bn_mom, training=is_training)
     net = dense(net, 256, bn=bn, bn_mom=bn_mom, training=is_training)
     net = tf.layers.dropout(net, rate=0.7, training=is_training)
