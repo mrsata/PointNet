@@ -104,20 +104,19 @@ def train():
             'pred': pred,
             'loss': loss,
             'train_op': train_op,
-            'learning_rate': LR,
+            'learning_rate': learning_rate,
         }
 
         log('\nStart training\n')
         start = time()
 
         for ep in range(MAX_EPOCH):
-            if ep == 20: ops['learning_rate'] /= 10
+            if ep == 20: LR /= 10
             log("#### EPOCH {:03} ####".format(ep + 1))
             begin = time()
             train_one_epoch(data_train, sess, ops)
             log("---- Time elapsed: {:.2f}s".format(time() - begin))
             eval_one_epoch(data_test, sess, ops)
-            # save_path = saver.save(sess, "log/model_B%dN%d.ckpt" % (B, N//1000))
             save_path = saver.save(sess, os.path.join(LOG_DIR, "model.ckpt"))
 
         log("Total time: {:.2f}s".format(time() - start))
@@ -131,7 +130,8 @@ def train_one_epoch(data, sess, ops):
         pclouds, digits = load_batch(data, b)
         feed_dict = {ops['inputs']: pclouds,
                      ops['labels']: digits,
-                     ops['is_training']: is_training,}
+                     ops['is_training']: is_training,
+                     ops['learning_rate']: LR}
         _, loss_val, pred_val = sess.run([ops['train_op'], ops['loss'], ops['pred']], feed_dict=feed_dict)
 
         pred_val = np.argmax(pred_val, 1)
